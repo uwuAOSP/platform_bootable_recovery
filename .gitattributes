@@ -1,0 +1,2 @@
+# Unified patches require a single-space prefix on empty context lines.
+tools/crypto/patches/*.patch whitespace=-blank-at-eol

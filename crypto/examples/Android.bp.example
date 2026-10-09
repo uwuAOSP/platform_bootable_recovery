@@ -1,0 +1,16 @@
+/*
+ * SPDX-FileCopyrightText: The uwuAOSP Project
+ * SPDX-License-Identifier: Apache-2.0
+ */
+// Device-tree example, excluded from the default Recovery build.
+cc_library_shared {
+    name: "librecovery_crypto_mydevice",
+    stem: "librecovery_crypto_backend",
+    recovery: true,
+    compile_multilib: "first",
+    srcs: ["backend.cpp"],
+    header_libs: ["librecovery_crypto_backend_headers"],
+    // Add ONLY reviewed recovery variants of your actual Android 17 crypto
+    // dependencies. Merely copying vendor binaries does not add these variants.
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+}

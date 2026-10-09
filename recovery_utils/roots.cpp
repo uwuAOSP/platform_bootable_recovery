@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (C) 2026 The uwuAOSP Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -442,7 +443,7 @@ int format_volume(const std::string& volume) {
   return format_volume(volume, "", "");
 }
 
-int setup_install_mounts() {
+int setup_install_mounts(bool preserve_data) {
   if (fstab.empty()) {
     LOG(ERROR) << "can't set up install mounts: no fstab loaded";
     return -1;
@@ -450,6 +451,13 @@ int setup_install_mounts() {
   for (const FstabEntry& entry : fstab) {
     // We don't want to do anything with "/".
     if (entry.mount_point == "/") {
+      continue;
+    }
+
+    // A/B packages may be served by a FUSE process reading decrypted /data.
+    // Preserve its existing mount without mounting or changing it here.
+    if (preserve_data && entry.mount_point == "/data") {
+      LOG(INFO) << "Keeping /data mounted for A/B OTA package access";
       continue;
     }
 

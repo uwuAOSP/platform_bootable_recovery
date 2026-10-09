@@ -1,4 +1,5 @@
 // Copyright (C) 2019 The Android Open Source Project
+// Copyright (C) 2026 The uwuAOSP Project
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -59,6 +60,13 @@ cc_defaults {
 }
 
 cc_test_host {
+    name: "recovery_image_format_test",
+    srcs: ["image_format_test.cpp", "image_flash_policy_test.cpp"],
+    cpp_std: "c++20",
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+}
+
+cc_test_host {
     name: "libinstall_host_unittests",
     defaults: [
         "libspl_check_defaults",
@@ -106,6 +114,8 @@ cc_library_static {
 
     srcs: [
         "adb_install.cpp",
+        "crypto.cpp",
+        "image_flash.cpp",
         "fuse_install.cpp",
         "virtiofs_install.cpp",
         "install.cpp",
@@ -119,6 +129,8 @@ cc_library_static {
         "libminadbd_headers",
         "libupdate_engine_headers",
     ],
+
+    static_libs: ["librecovery_crypto", "librecovery_mtp_controller"],
 
     shared_libs: [
         "librecovery_ui",

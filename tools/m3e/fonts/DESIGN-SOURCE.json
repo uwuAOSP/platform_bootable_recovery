@@ -1,0 +1,123 @@
+{
+  "fonts": [
+    {
+      "file": "GoogleSansFlex.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/6e8069ff8ba3dab2a397fb30e7fbd243aba9b57a/ofl/googlesansflex/GoogleSansFlex%5BGRAD%2CROND%2Copsz%2Cslnt%2Cwdth%2Cwght%5D.ttf",
+      "git_commit": "6e8069ff8ba3dab2a397fb30e7fbd243aba9b57a",
+      "git_blob": "32fa9a00044d11fa226b39159e4907d9a16245c8",
+      "sha256": "c31a482fbecbf2e07e6890134d20078723aadf732c9b9c6c9a44f86f8265b6fe"
+    },
+    {
+      "file": "GoogleSansCode.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/6e8069ff8ba3dab2a397fb30e7fbd243aba9b57a/ofl/googlesanscode/GoogleSansCode%5Bwght%5D.ttf",
+      "git_commit": "6e8069ff8ba3dab2a397fb30e7fbd243aba9b57a",
+      "git_blob": "4b63b009b1f32a2ad99b38790d1e8e87ae7d89df",
+      "sha256": "c9649573afcd966f61096b1e9c3c3115e7b54315ca2adf9839c6f8b17d5f8e1f"
+    },
+    {
+      "file": "Outfit.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/6e8069ff8ba3dab2a397fb30e7fbd243aba9b57a/ofl/outfit/Outfit%5Bwght%5D.ttf",
+      "git_commit": "6e8069ff8ba3dab2a397fb30e7fbd243aba9b57a",
+      "git_blob": "466d6245f9582df39bf73da91a8b3c938fd061cd",
+      "sha256": "fc7287273e66929776e2ba54f144fe699080bec29f61bf649d70d871468aeade"
+    },
+    {
+      "file": "MaterialSymbolsRounded.ttf",
+      "source": "https://raw.githubusercontent.com/google/material-design-icons/737e3324305806514d7909874fa1818ae1808232/variablefont/MaterialSymbolsRounded%5BFILL%2CGRAD%2Copsz%2Cwght%5D.ttf",
+      "git_commit": "737e3324305806514d7909874fa1818ae1808232",
+      "source_sha256": "95b24392bb49efd1bc3e92cff4e2452ad094461bab7c97e7d8723fab97e330ca",
+      "sha256": "a7bef8ca51a2f44bf088a91065077d6469558eee73d671aea26cbf2ebe8ab608",
+      "subset": {
+        "fonttools": "4.66.1",
+        "names": {
+          "Back": "arrow_back",
+          "Chevron": "chevron_right",
+          "Android": "android",
+          "Chip": "developer_board",
+          "Refresh": "restart_alt",
+          "Gear": "settings",
+          "Terminal": "terminal",
+          "Storage": "storage",
+          "Warning": "warning",
+          "Phone": "system_update",
+          "Trash": "delete",
+          "Power": "power_settings_new",
+          "BatteryEmpty": "battery_android_0",
+          "Battery1": "battery_android_1",
+          "Battery2": "battery_android_2",
+          "Battery3": "battery_android_3",
+          "Battery4": "battery_android_4",
+          "Battery5": "battery_android_5",
+          "Battery6": "battery_android_6",
+          "BatteryFull": "battery_android_full",
+          "BatteryCharging20": "battery_charging_20_2",
+          "BatteryCharging30": "battery_charging_30_2",
+          "BatteryCharging50": "battery_charging_50_2",
+          "BatteryCharging60": "battery_charging_60_2",
+          "BatteryCharging80": "battery_charging_80_2",
+          "BatteryChargingFull": "battery_charging_full_2"
+        },
+        "recalc_timestamp": false,
+        "name_IDs": "*",
+        "name_languages": "*"
+      }
+    }
+  ],
+  "symbols": {
+    "Back": 58820,
+    "Chevron": 58828,
+    "Android": 59481,
+    "Chip": 58125,
+    "Refresh": 61523,
+    "Gear": 59576,
+    "Terminal": 60302,
+    "Storage": 57819,
+    "Warning": 61571,
+    "Phone": 62157,
+    "Trash": 59694,
+    "Power": 63687,
+    "BatteryEmpty": 62221,
+    "Battery1": 62220,
+    "Battery2": 62219,
+    "Battery3": 62218,
+    "Battery4": 62217,
+    "Battery5": 62216,
+    "Battery6": 62215,
+    "BatteryFull": 62212,
+    "BatteryCharging20": 1048382,
+    "BatteryCharging30": 1048381,
+    "BatteryCharging50": 1048380,
+    "BatteryCharging60": 1048379,
+    "BatteryCharging80": 1048378,
+    "BatteryChargingFull": 1048377
+  },
+  "licenses": [
+    {
+      "file": "GoogleSansFlex-OFL.txt",
+      "source": "https://raw.githubusercontent.com/google/fonts/6e8069ff8ba3dab2a397fb30e7fbd243aba9b57a/ofl/googlesansflex/OFL.txt",
+      "git_commit": "6e8069ff8ba3dab2a397fb30e7fbd243aba9b57a",
+      "git_blob": "3e50f6cb72e58f01997d1e608195e8fdbc0eb8b4",
+      "sha256": "eb84c68dfbd18e01770faf7d726c2062328e09b98b9b8922efe6cfce4a1619cc",
+      "source_sha256": "fc13d69f63e36d284b6e383d4d1463d8ad404f0aa065e57cf961252d51063137",
+      "normalization": "CRLF to LF; trim trailing whitespace"
+    },
+    {
+      "file": "GoogleSansCode-OFL.txt",
+      "source": "https://raw.githubusercontent.com/google/fonts/6e8069ff8ba3dab2a397fb30e7fbd243aba9b57a/ofl/googlesanscode/OFL.txt",
+      "git_commit": "6e8069ff8ba3dab2a397fb30e7fbd243aba9b57a",
+      "git_blob": "a65b4bbe0f4a1242cc31c1d687996336dceef0eb",
+      "sha256": "58d145732eea7ee61940a7eccecad160772b8621171b69b62183a5c7eb967740",
+      "source_sha256": "ff8f4fbc4f1a71c7d4c6481c48dc2b21c43f8dc15872536667fee45c15d20928",
+      "normalization": "CRLF to LF; trim trailing whitespace"
+    },
+    {
+      "file": "Outfit-OFL.txt",
+      "source": "https://raw.githubusercontent.com/google/fonts/6e8069ff8ba3dab2a397fb30e7fbd243aba9b57a/ofl/outfit/OFL.txt",
+      "git_commit": "6e8069ff8ba3dab2a397fb30e7fbd243aba9b57a",
+      "git_blob": "723cd447edee83ed3bb07c3343f478d352aa7440",
+      "sha256": "e2a6bbb2589b85bac1690ec8f220b22a9c3af9bfda56df6391f7ab491c7a039f",
+      "source_sha256": "c676351bf8576b9aba743cd5eaa8c0e7ee0d51f805d720447b4df4ddb6a2e416",
+      "normalization": "CRLF to LF; trim trailing whitespace"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+/*
+ * SPDX-FileCopyrightText: The uwuAOSP Project
+ * SPDX-License-Identifier: Apache-2.0
+ */
+// Copy into device/<vendor>/<device>/recovery-crypto/Android.bp. Rename modules.
+// Do not enable without reviewing HAL startup, dependencies, fstab and SELinux.
+prebuilt_etc {
+    name: "mydevice_recovery_crypto_profile",
+    recovery: true,
+    src: "recovery.crypto.conf",
+    filename: "recovery.crypto.conf",
+}
+prebuilt_etc {
+    name: "mydevice_recovery_crypto_fstab",
+    recovery: true,
+    src: "recovery.crypto.fstab",
+    filename: "recovery.crypto.fstab",
+}

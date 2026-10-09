@@ -5,6 +5,9 @@
     },
     {
       "name": "recovery_unit_test"
+    },
+    {
+      "name": "recovery_crypto_protocol_test"
     }
   ],
   "postsubmit": [

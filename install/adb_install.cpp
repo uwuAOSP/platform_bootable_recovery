@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2012 The Android Open Source Project
+ * Copyright (C) 2026 The uwuAOSP Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -112,6 +113,7 @@ static auto AdbInstallPackageHandler(Device* device, InstallResult* result) {
       }
     }
     ui->CancelWaitKey();
+    ui->SetInstallStage(RecoveryUI::InstallStage::VERIFYING);
 
     auto package =
         Package::CreateFilePackage(FUSE_SIDELOAD_HOST_PATHNAME,
@@ -355,6 +357,7 @@ static void CreateMinadbdServiceAndExecuteCommands(
 }
 
 InstallResult ApplyFromAdb(Device* device, bool rescue_mode, Device::BuiltinAction* reboot_action) {
+  if (!rescue_mode) device->GetUI()->SetInstallStage(RecoveryUI::InstallStage::WAITING);
   // Save the usb state to restore after the sideload operation.
   std::string usb_state = android::base::GetProperty("sys.usb.state", "none");
   // Clean up state and stop adbd.
@@ -387,6 +390,7 @@ InstallResult ApplyFromAdb(Device* device, bool rescue_mode, Device::BuiltinActi
         "to the device with \"adb sideload <filename>\"...\n");
   } else {
     command_map.emplace(MinadbdCommand::kWipeData, [&device]() {
+      device->GetUI()->SetInstallStage(RecoveryUI::InstallStage::NONE);
       bool result = WipeData(device);
       return std::make_pair(result, true);
     });

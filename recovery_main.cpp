@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2018 The Android Open Source Project
  * Copyright (C) 2019 The LineageOS Project
+ * Copyright (C) 2026 The uwuAOSP Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,6 +58,7 @@
 #include "otautil/sysutil.h"
 #include "recovery.h"
 #include "recovery_ui/device.h"
+#include "recovery_ui/m3e_locale_store.h"
 #include "recovery_ui/stub_ui.h"
 #include "recovery_ui/ui.h"
 #include "recovery_utils/logging.h"
@@ -425,6 +427,10 @@ int main(int argc, char** argv) {
   optind = 1;
   opterr = 1;
 
+  // An explicit --locale argument keeps its upstream precedence.
+  if (locale.empty() && ensure_path_mounted("/metadata") == 0) {
+    locale = recovery_m3e::ReadLocaleAt(recovery_m3e::kLocaleDirectory);
+  }
   if (locale.empty()) {
     if (HasCache()) {
       locale = load_locale_from_cache();

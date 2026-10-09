@@ -1,0 +1,44 @@
+/*
+ * SPDX-FileCopyrightText: The uwuAOSP Project
+ * SPDX-License-Identifier: Apache-2.0
+ */
+package {
+    default_applicable_licenses: ["bootable_recovery_license"],
+}
+
+cc_library_headers {
+    name: "librecovery_crypto_backend_headers",
+    recovery_available: true,
+    export_include_dirs: ["include"],
+    visibility: ["//visibility:public"],
+}
+
+cc_library_static {
+    name: "librecovery_crypto",
+    recovery_available: true,
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+    srcs: ["session.cpp", "protocol.cpp", "storage.cpp"],
+    export_include_dirs: ["include"],
+    shared_libs: ["libbase"],
+    required: ["recovery_crypto_worker"],
+}
+
+cc_binary {
+    name: "recovery_crypto_worker",
+    recovery: true,
+    compile_multilib: "first",
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+    srcs: ["worker.cpp", "protocol.cpp"],
+    local_include_dirs: ["include"],
+    shared_libs: ["libdl"],
+}
+
+// Test sources are supplied for the maintainer to build. No fake backend is
+// selected or installed into normal Recovery images.
+cc_test {
+    name: "recovery_crypto_protocol_test",
+    srcs: ["tests/protocol_test.cpp", "protocol.cpp"],
+    local_include_dirs: ["include", "."],
+    test_suites: ["device-tests"],
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+}

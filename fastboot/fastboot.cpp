@@ -1,4 +1,8 @@
 /*
+ * SPDX-FileCopyrightText: The uwuAOSP Project
+ * SPDX-License-Identifier: Apache-2.0
+ */
+/*
  * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -38,6 +42,11 @@ static const std::vector<std::pair<std::string, Device::BuiltinAction>> kFastboo
 };
 
 void FillDefaultFastbootLines(std::vector<std::string>& title_lines) {
+  std::string version = android::base::GetProperty("ro.uwu.release", "");
+  if (version.empty()) version = android::base::GetProperty("ro.uwu.build.version", "");
+  if (version.empty()) version = android::base::GetProperty("ro.lineage.build.version", "");
+  if (version.empty()) version = android::base::GetProperty("ro.build.version.incremental", "(unknown)");
+  title_lines.push_back("Version " + version);
   std::string bootloader_version = android::base::GetProperty("ro.bootloader", "");
   std::string baseband_version = android::base::GetProperty("ro.build.expect.baseband", "");
   std::string hw_version = android::base::GetProperty(
@@ -98,7 +107,9 @@ Device::BuiltinAction StartFastboot(Device* device, const std::vector<std::strin
   }
 
   std::vector<std::string> fastboot_menu_items;
-  std::transform(kFastbootMenuActions.cbegin(), kFastbootMenuActions.cend(),
+  auto actions = kFastbootMenuActions;
+  if (!ui->IsWearable()) std::swap(actions[1], actions[2]);
+  std::transform(actions.cbegin(), actions.cend(),
                  std::back_inserter(fastboot_menu_items),
                  [](const auto& entry) { return entry.first; });
 
@@ -112,5 +123,5 @@ Device::BuiltinAction StartFastboot(Device* device, const std::vector<std::strin
   if (chosen_item == static_cast<size_t>(RecoveryUI::KeyError::TIMED_OUT)) {
     return Device::BuiltinAction::NO_ACTION;
   }
-  return kFastbootMenuActions[chosen_item].second;
+  return actions[chosen_item].second;
 }

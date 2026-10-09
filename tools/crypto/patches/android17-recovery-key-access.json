@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "patch": "android17-recovery-key-access.patch",
+  "sha256": "c307f9e94e460d4c11b3e225e17b474ef1ee34596daddf69f16493c0bc41e64a",
+  "files": {
+    "private/vold.te": {
+      "base_sha256": "f79b6c1881177bb89805c48985a25620724073135b775ea76d3635afdc1e53d5",
+      "patched_sha256": "90791c5f1d8b70a1f4e006ff6c544c6dee3bfe6ede386d20d661619b87ab81be"
+    },
+    "private/keystore.te": {
+      "base_sha256": "0302b05310c98b4e145da4eb77fb85bfad4462387b8e0ccc593de5a6b98c1a22",
+      "patched_sha256": "b8e9acdfa8ad9e9e5cd8eab005dc5de02349b138b301591d86449149134a1426"
+    },
+    "public/te_macros": {
+      "base_sha256": "62c1800eba089dd920b33ec5f832d7594560f954354f9a50db01cce2a5170ae7",
+      "patched_sha256": "fa8d8f7c3a04f2cc85cd6255452ac360ead8ff41a0b33f96409d7d2cbb38a7b0"
+    }
+  },
+  "fixture_global_macros_sha256": "f79a4ef588cdadf9e5ed5d3f5565b33da56a5d2fda01edaadcfab1bac0199117",
+  "source": "https://android.googlesource.com/platform/system/sepolicy/+/refs/heads/main/",
+  "scope": "Opt-in Recovery existing-key reads and fscrypt add/status; original write/execute/remove bans retained. Base hashes document review inputs; context matching permits unrelated edits."
+}
