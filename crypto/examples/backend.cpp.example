@@ -1,0 +1,19 @@
+/*
+ * SPDX-FileCopyrightText: The uwuAOSP Project
+ * SPDX-License-Identifier: Apache-2.0
+ */
+// Copy to YOUR DEVICE TREE. This deliberately disabled skeleton is NOT an
+// Android 17 decryptor and must not be advertised as tested decryption.
+#include <recovery_crypto/backend.h>
+
+namespace {
+int32_t Unsupported(uint32_t) { return RC_UNSUPPORTED; }
+int32_t CredentialType(uint32_t, uint32_t*) { return RC_UNSUPPORTED; }
+int32_t Unlock(uint32_t, uint32_t, const uint8_t*, size_t, uint32_t*) { return RC_UNSUPPORTED; }
+void Finish() {}
+const recovery_crypto_backend_v1 backend{
+    RECOVERY_CRYPTO_BACKEND_ABI, sizeof(recovery_crypto_backend_v1),
+    Unsupported, Unsupported, Unsupported, CredentialType, Unlock, Finish,
+};
+}  // namespace
+extern "C" const recovery_crypto_backend_v1* recovery_crypto_get_backend_v1() { return &backend; }

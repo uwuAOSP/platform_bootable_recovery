@@ -1,0 +1,57 @@
+diff --git a/private/property_contexts b/private/property_contexts
+--- a/private/property_contexts
++++ b/private/property_contexts
+@@ -1964,3 +1964,7 @@
+ 
+ # Wear dynamic thermal profile property
+ thermal.dynamic_config_profile    u:object_r:thermal_profile_prop:s0 exact enum default setup kids_setup kids
++
++# BEGIN RECOVERY MTP PROPERTIES
++ctl.stop$recovery-mtp   u:object_r:usb_control_prop:s0
++# END RECOVERY MTP PROPERTIES
+diff --git a/private/recovery.te b/private/recovery.te
+--- a/private/recovery.te
++++ b/private/recovery.te
+@@ -1,3 +1,6 @@
++# BEGIN RECOVERY MTP GATE
++define(`recovery_mtp_only', `ifelse(target_recovery, `true', `ifelse(recovery_mtp, `true', `$1')')')
++# END RECOVERY MTP GATE
+ typeattribute recovery coredomain;
+ 
+ # The allow rules are only included in the recovery policy.
+@@ -209,10 +212,34 @@
+    -cache_file
+    -cache_recovery_file
+   with_native_coverage(`-method_trace_data_file')
+-}:file { no_w_file_perms no_x_file_perms };
++  recovery_mtp_only(`-media_rw_data_file')
++}:file no_w_file_perms;
++# Media files must never become executable, even on an adapted product.
+ neverallow recovery {
+    data_file_type
+    -cache_file
+    -cache_recovery_file
+   with_native_coverage(`-method_trace_data_file')
++}:file no_x_file_perms;
++neverallow recovery {
++   data_file_type
++   -cache_file
++   -cache_recovery_file
++  with_native_coverage(`-method_trace_data_file')
++  recovery_mtp_only(`-media_rw_data_file')
+ }:dir no_w_dir_perms;
++
++# BEGIN RECOVERY MTP
++recovery_only(`
++  get_prop(recovery, recovery_usb_config_prop)
++  allowxperm recovery functionfs:file ioctl { FUNCTIONFS_ENDPOINT_DESC FUNCTIONFS_ENDPOINT_REVMAP FUNCTIONFS_ENDPOINT_ALLOC };
++')
++recovery_mtp_only(`
++  # Only shared media; key, keystore and credential types retain their bans.
++  allow recovery media_rw_data_file:dir create_dir_perms;
++  # O_TMPFILE uploads are published with linkat after their contents are flushed.
++  # create_file_perms does not include link.
++  allow recovery media_rw_data_file:file { create_file_perms link };
++  allowxperm recovery { userdata_block_device dm_device }:blk_file ioctl BLKROGET;
++')
++# END RECOVERY MTP

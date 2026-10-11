@@ -1,0 +1,26 @@
+diff --git a/private/property_contexts b/private/property_contexts
+--- a/private/property_contexts
++++ b/private/property_contexts
+@@ -1964,3 +1964,7 @@
+ 
+ # Wear dynamic thermal profile property
+ thermal.dynamic_config_profile    u:object_r:thermal_profile_prop:s0 exact enum default setup kids_setup kids
++
++# BEGIN RECOVERY MTP PROPERTIES
++ctl.stop$recovery-mtp   u:object_r:usb_control_prop:s0
++# END RECOVERY MTP PROPERTIES
+diff --git a/private/recovery.te b/private/recovery.te
+--- a/private/recovery.te
++++ b/private/recovery.te
+@@ -216,3 +216,11 @@
+    -cache_recovery_file
+   with_native_coverage(`-method_trace_data_file')
+ }:dir no_w_dir_perms;
++
++# BEGIN RECOVERY MTP READONLY
++recovery_only(`
++  get_prop(recovery, recovery_usb_config_prop)
++  # Descriptor queries and endpoint mapping/allocation, not arbitrary ioctls.
++  allowxperm recovery functionfs:file ioctl { FUNCTIONFS_ENDPOINT_DESC FUNCTIONFS_ENDPOINT_REVMAP FUNCTIONFS_ENDPOINT_ALLOC };
++')
++# END RECOVERY MTP READONLY

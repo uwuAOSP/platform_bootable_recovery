@@ -1,0 +1,18 @@
+[
+  {
+    "file": "GoogleSans.ttf",
+    "source": "https://raw.githubusercontent.com/google/fonts/a0e3dbcdc3a3ecfafff3f071159ae0221628922d/ofl/googlesans/GoogleSans%5BGRAD%2Copsz%2Cwght%5D.ttf",
+    "git_commit": "a0e3dbcdc3a3ecfafff3f071159ae0221628922d",
+    "git_blob": "a5e76cc713206f1cfe9a7fc31cc1b6f035034d81",
+    "sha256": "d0a87d835a944b8b40d0e82a5651bb59ab97b936a2aeed5946eb57e7b2a3a90a"
+  },
+  {
+    "file": "OFL.txt",
+    "source": "https://raw.githubusercontent.com/google/fonts/a0e3dbcdc3a3ecfafff3f071159ae0221628922d/ofl/googlesans/OFL.txt",
+    "git_commit": "a0e3dbcdc3a3ecfafff3f071159ae0221628922d",
+    "git_blob": "035131accc0d7bc0ec5880f906800ebe1b1f854f",
+    "sha256": "65ca17f235e1d9adaf2e25fd14d0929c75521ac1e063a48d6824a8e7b7e4466a",
+    "source_sha256": "2b75ef20f13d83a7514aee452c4782c20cdc9ff2dee17600f44d37a06d4fb958",
+    "normalization": "CRLF to LF"
+  }
+]

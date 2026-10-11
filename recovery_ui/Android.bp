@@ -1,4 +1,5 @@
 // Copyright (C) 2019 The Android Open Source Project
+// Copyright (C) 2026 The uwuAOSP Project
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,8 +22,34 @@ package {
     default_applicable_licenses: ["bootable_recovery_license"],
 }
 
+// The UI text fonts and Noto Sans SC glyph data use the SIL Open Font License.
+license {
+    name: "recovery_m3e_font_license",
+    visibility: [":__subpackages__"],
+    license_kinds: ["SPDX-license-identifier-OFL"],
+    license_text: [
+        "m3e-font-OFL.txt",
+        "m3e-cjk-OFL.txt",
+        "m3e-GoogleSansFlex-OFL.txt",
+        "m3e-GoogleSansCode-OFL.txt",
+        "m3e-Outfit-OFL.txt",
+    ],
+}
+
+license {
+    name: "recovery_m3e_symbols_license",
+    visibility: [":__subpackages__"],
+    license_kinds: ["SPDX-license-identifier-Apache-2.0"],
+    license_text: ["m3e-symbols-LICENSE.txt"],
+}
+
 cc_library {
     name: "librecovery_ui",
+    licenses: [
+        "bootable_recovery_license",
+        "recovery_m3e_font_license",
+        "recovery_m3e_symbols_license",
+    ],
     recovery_available: true,
 
     defaults: [

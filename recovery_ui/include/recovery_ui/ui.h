@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2011 The Android Open Source Project
  * Copyright (C) 2019 The LineageOS Project
+ * Copyright (C) 2026 The uwuAOSP Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +18,10 @@
 
 #ifndef RECOVERY_UI_H
 #define RECOVERY_UI_H
+
+#include "recovery_ui/install_status.h"
+#include "recovery_ui/pattern_input.h"
+#include "recovery_ui/password_input.h"
 
 #include <linux/input.h>  // KEY_MAX
 
@@ -80,6 +85,10 @@ class Point {
 // Abstract class for controlling the user interface during recovery.
 class RecoveryUI {
  public:
+  using InstallStage = recovery_ui::InstallStage;
+  // Optional presentation API; custom/stub UIs keep their existing behavior.
+  virtual void SetInstallStage(InstallStage) {}
+  virtual void ShowTerminal() { Print("Terminal is unavailable on this UI.\n"); }
   enum Icon {
     NONE,
     INSTALLING_UPDATE,
@@ -110,6 +119,9 @@ class RecoveryUI {
     EXTRA,
     KEY,
     TOUCH,
+    TOUCH_DOWN,
+    TOUCH_MOVE,
+    TOUCH_UP,
   };
 
   class InputEvent {
@@ -123,6 +135,7 @@ class RecoveryUI {
     explicit InputEvent(const Point& pos) : type_(EventType::TOUCH), evt_({ 0 }) {
       evt_.pos = pos;
     }
+    InputEvent(EventType type, const Point& pos) : type_(type), evt_({ 0 }) { evt_.pos = pos; }
 
     EventType type() const {
       return type_;
@@ -159,6 +172,8 @@ class RecoveryUI {
   virtual bool Init(const std::string& locale);
 
   virtual std::string GetLocale() const = 0;
+  virtual bool SetUiLanguage(const std::string&) { return false; }
+  virtual std::string ConsumeLanguagePreference() { return {}; }
 
   // Shows a stage indicator. Called immediately after Init().
   virtual void SetStage(int current, int max) = 0;
@@ -192,6 +207,9 @@ class RecoveryUI {
   virtual void Print(const char* fmt, ...) __printflike(2, 3) = 0;
   virtual void PrintOnScreenOnly(const char* fmt, ...) __printflike(2, 3) = 0;
 
+  // Clears transient on-screen text without affecting the recovery log.
+  virtual void ClearText() {}
+
   // Shows the contents of the given file. Caller ensures the patition that contains the file has
   // been mounted.
   virtual void ShowFile(const std::string& filename) = 0;
@@ -218,6 +236,10 @@ class RecoveryUI {
 
   // Returns true if it supports touch inputs.
   virtual bool HasTouchScreen() const;
+
+  // Optional graphical pattern input. Custom/stub UIs can decline it safely.
+  virtual bool ReadPattern(recovery_ui::PatternInput&) { return false; }
+  virtual bool ReadPassword(recovery_ui::PasswordInput& input) { input.Clear(); return false; }
 
   // Erases any queued-up keys.
   virtual void FlushKeys();
@@ -314,6 +336,14 @@ class RecoveryUI {
  protected:
   void EnqueueKey(int key_code);
   void EnqueueTouch(const Point& pos);
+  void EnqueueGesture(EventType type, const Point& pos);
+  void SetTouchMoveCoalescing(bool enabled, const Point& minimum, const Point& maximum);
+  // Credential pages use raw gestures; ordinary menus keep swipe scrolling.
+  std::atomic<bool> gesture_input_{false};
+  // Terminal drags need the latest position; pattern entry must retain every point.
+  bool coalesce_touch_moves_=false,coalescing_gesture_=false;
+  Point coalesce_touch_min_,coalesce_touch_max_; // Guarded by event_queue_mutex.
+  std::atomic<bool> discard_touch_until_press_{false};
 
   // The normal and dimmed brightness percentages (default: 50 and 25, which means 50% and 25% of
   // the max_brightness). Because the absolute values may vary across devices. These two values can

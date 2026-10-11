@@ -1,0 +1,32 @@
+{
+  "frameworks/av": {
+    "revision": "05f24479ea6d6faf6f32155ec9bbefe9eeeb1391",
+    "sha256": {
+      "media/mtp/Android.bp": "7697fa7046f3a1b56768e6ad53d015a2c3364d59a3234bed5bbfcccdbb5fe4e5",
+      "media/mtp/MtpServer.cpp": "c03ef1299e8f6c0735fc9b257c05d02f6cd696bcee19c2f9fd309f9b2ea14e36",
+      "media/mtp/MtpStorage.cpp": "4d8c1fbb3b526264fc2188208f102ae82132fdc166eb8e626999c707245c5b73",
+      "media/mtp/MtpFfsHandle.cpp": "8c75671a917c704419c2b6aee109599e4f5a675f3886b03cefffd8e229e83c71",
+      "media/mtp/MtpFfsCompatHandle.cpp": "710f812aab16fbfdad55405f9cee751f0d5bfcee50624830fe340077b3ca0467",
+      "media/mtp/IMtpDatabase.h": "8ee9688ecf8be33665267a1ae579446d7e86f28d97b87711ad460642ac09f064",
+      "media/mtp/MtpDataPacket.cpp": "5dac5d6f7002b526f18e89079ad8dccca462cef5062ac1889c41285c42208193"
+    }
+  },
+  "system/sepolicy": {
+    "sha256": {
+      "private/property_contexts": "2a7e3fa9ff5b471369fec84a1959a8c0dc98acc505a1f57e0e43d4f9b9ab1af4",
+      "private/recovery.te": "f52f2b2b459021720a26e558663e809ab3269dbd8236580967ad18dd68db3804"
+    },
+    "revision": "b41cbf3b46882139654574fe46ca5cf8175bf8a5",
+    "input": "Reviewed working-tree input with existing opt-in Recovery crypto policy."
+  },
+  "note": "Recovery-only fd-based upload/delete/rename; normal Android transport unchanged. Device compilation and USB validation remain outstanding.",
+  "dependency_review": {
+    "system/core/libusbhost/Android.bp": {
+      "sha256": "3cb57c2231b04cda073d9cf29835e0d73df521aa3a1238b233b43d3efb88f9e0",
+      "decision": "No Recovery variant: excluded from transport link dependencies; only its headers are included. All compiled USB host calls are guarded by MTP_HOST, which is undefined in this variant."
+    },
+    "system/core/libusbhost/include/usbhost/usbhost.h": {
+      "sha256": "4a04d2ca799ea09db42683fbbe9033e4e37fb4b79df85883a3b0bf6352fc553c"
+    }
+  }
+}

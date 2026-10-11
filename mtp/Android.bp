@@ -1,0 +1,65 @@
+/*
+ * SPDX-FileCopyrightText: The uwuAOSP Project
+ * SPDX-License-Identifier: Apache-2.0
+ */
+package { default_applicable_licenses: ["bootable_recovery_license"], }
+
+cc_library_static {
+    name: "librecovery_mtp_controller",
+    recovery_available: true,
+    srcs: ["controller.cpp"],
+    export_include_dirs: ["include"],
+    static_libs: ["librecovery_crypto"],
+    shared_libs: ["libbase"],
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+}
+
+soong_config_module_type {
+    name: "recovery_mtp_defaults_type",
+    module_type: "cc_defaults",
+    config_namespace: "recovery_mtp",
+    bool_variables: ["enabled"],
+    properties: ["enabled", "static_libs"],
+}
+recovery_mtp_defaults_type {
+    name: "recovery_mtp_opt_in",
+    enabled: false,
+    soong_config_variables: {
+        enabled: {
+            enabled: true,
+        },
+    },
+}
+// Add the private Recovery library only for opted-in products. Keep this
+// separate from the enable gate: native database tests use normal libmtp.
+recovery_mtp_defaults_type {
+    name: "recovery_mtp_transport_link",
+    soong_config_variables: {
+        enabled: {
+            static_libs: ["librecovery_mtp_transport"],
+        },
+    },
+}
+cc_binary {
+    name: "recovery_mtp",
+    defaults: ["recovery_mtp_opt_in", "recovery_mtp_transport_link"],
+    recovery: true,
+    compile_multilib: "first",
+    srcs: ["daemon.cpp", "database.cpp"],
+    static_libs: ["librecovery_crypto"],
+    header_libs: ["libcutils_headers"],
+    shared_libs: ["libbase", "liblog", "libasyncio"],
+    cflags: ["-Wall", "-Wextra", "-Werror", "-DRECOVERY_MTP"],
+    init_rc: ["recovery-mtp.rc"],
+}
+// Normal Android test variant: gtest has no Recovery variant in this tree.
+// Test source supplied for maintainers; not installed in the Recovery image.
+cc_test {
+    name: "recovery_mtp_database_test",
+    defaults: ["recovery_mtp_opt_in"],
+    srcs: ["tests/database_test.cpp", "database.cpp"],
+    local_include_dirs: ["."],
+    shared_libs: ["libbase", "libmtp"],
+    cflags: ["-Wall", "-Wextra", "-Werror", "-DRECOVERY_MTP"],
+    test_suites: ["device-tests"],
+}

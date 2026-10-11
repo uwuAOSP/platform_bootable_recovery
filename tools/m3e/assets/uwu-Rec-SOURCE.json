@@ -1,0 +1,10 @@
+{
+  "author": "Jelly10086 / AOSP-VtuberLOGO",
+  "source": "https://github.com/Jelly10086/AOSP-VtuberLOGO/blob/main/uwuAOSP/PNG/uwu-Rec.png",
+  "sha256": "e3008a032a1e4fc76fdf6dfe96d663c28f26c1daaecf97edd47d72451fb06d4c",
+  "original_size": [1890, 1417],
+  "alpha_bounds": [658, 469, 1311, 933],
+  "display_width_dp": 200,
+  "background": [0, 0, 0],
+  "note": "Original artwork retained unmodified. Generated display resources crop transparent padding, scale proportionally and composite onto the black M3E page background for minui RGB compatibility."
+}
