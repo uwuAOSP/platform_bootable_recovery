@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (C) 2026 The uwuAOSP Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,6 +59,7 @@
 #include "otautil/sysutil.h"
 #include "recovery_ui/screen_ui.h"
 #include "recovery_ui/ui.h"
+#include "recovery_ui/m3e_locale_store.h"
 #include "recovery_utils/battery_utils.h"
 #include "recovery_utils/logging.h"
 #include "recovery_utils/roots.h"
@@ -131,6 +133,13 @@ static bool IsRoDebuggable() {
 // copy our log file to cache as well (for the system to read). This function is
 // idempotent: call it as many times as you like.
 static void FinishRecovery(RecoveryUI* ui) {
+  const std::string preference = ui->ConsumeLanguagePreference();
+  if (!preference.empty()) {
+    bool saved = ensure_path_mounted("/metadata") == 0 &&
+        recovery_m3e::SaveLocaleAt(recovery_m3e::kLocaleDirectory, preference);
+    ui->Print(saved ? "Recovery language saved.\n" :
+                     "Cannot save language; it remains active for this session.\n");
+  }
   std::string locale = ui->GetLocale();
   // Save the locale to cache, so if recovery is next started up without a '--locale' argument
   // (e.g., directly from the bootloader) it will use the last-known locale.
@@ -237,19 +246,22 @@ static InstallResult apply_update_menu(Device* device, Device::BuiltinAction* re
   std::vector<std::string> items;
 
   const int item_sideload = 0;
-  const int item_virtiofs = 1;
+  int item_virtiofs = -1;
   unsigned int non_storage_items;
   std::vector<VolumeInfo> volumes;
 
   InstallResult status = INSTALL_NONE;
 
   for (;;) {
-    non_storage_items = 1; // ADB sideload, at least
+    ui->SetInstallStage(RecoveryUI::InstallStage::NONE);
+    non_storage_items = 1; // ADB sideload
 
     items.clear();
     items.push_back("Apply from ADB");
 
+    item_virtiofs = -1;
     if (InitializeVirtiofs()) {
+      item_virtiofs = static_cast<int>(items.size());
       non_storage_items++;
       items.push_back("Choose from virtiofs");
     }
@@ -271,19 +283,27 @@ static InstallResult apply_update_menu(Device* device, Device::BuiltinAction* re
     if (chosen == Device::kRefresh) {
       continue;
     }
-    if (chosen == Device::kGoBack) {
+    if (chosen == Device::kGoBack || chosen == Device::kGoHome) {
       break;
     }
-    if (chosen == static_cast<size_t>(RecoveryUI::KeyError::INTERRUPTED)) {
+    if (chosen == static_cast<int>(RecoveryUI::KeyError::INTERRUPTED)) {
       return INSTALL_KEY_INTERRUPTED;
     }
 
     if (chosen == item_sideload) {
       status = ApplyFromAdb(device, false /* rescue_mode */, reboot_action);
-    } else if (chosen == item_virtiofs && InitializeVirtiofs()) {
+    } else if (item_virtiofs >= 0 && chosen == item_virtiofs) {
       status = ApplyFromVirtiofs(device);
     } else {
+      if (chosen < static_cast<int>(non_storage_items) ||
+          static_cast<size_t>(chosen - non_storage_items) >= volumes.size()) break;
       status = ApplyFromStorage(device, volumes[chosen - non_storage_items]);
+    }
+    if (status == INSTALL_NONE) {
+      // Cancelling a child returns to update methods, not the main menu.
+      ui->ClearText();
+      ui->ShowText(true);
+      continue;
     }
     break;
   }
@@ -476,6 +496,29 @@ static bool AskToReboot(Device* device, Device::BuiltinAction chosen_action) {
   return (chosen_item == 1);
 }
 
+// Keep the result visible until the user returns to the menu or opens the complete log.
+static void ShowInstallResult(Device* device, InstallResult result) {
+  auto ui = device->GetUI();
+  if (result == INSTALL_NONE) {
+    ui->SetInstallStage(RecoveryUI::InstallStage::NONE);
+    return;
+  }
+  auto stage = result == INSTALL_SUCCESS ? RecoveryUI::InstallStage::SUCCESS
+                                        : RecoveryUI::InstallStage::ERROR;
+  ui->SetInstallStage(stage);
+  while (ui->IsTextVisible()) {
+    size_t selected = ui->ShowMenu({ "Install result" }, { "Continue", "View recovery logs" },
+        0, true, std::bind(&Device::HandleMenuKey, device, std::placeholders::_1, std::placeholders::_2));
+    if (selected != 1) break;
+    // The file viewer retains its full, scrollable upstream text display.
+    ui->SetInstallStage(RecoveryUI::InstallStage::NONE);
+    fflush(stdout);
+    ui->ShowFile(Paths::Get().temporary_log_file());
+    ui->SetInstallStage(stage);
+  }
+  ui->SetInstallStage(RecoveryUI::InstallStage::NONE);
+}
+
 // Shows the recovery UI and waits for user input. Returns one of the device builtin actions, such
 // as REBOOT, SHUTDOWN, or REBOOT_BOOTLOADER. Returning NO_ACTION means to take the default, which
 // is to reboot or shutdown depending on if the --shutdown_after flag was passed to recovery.
@@ -483,6 +526,7 @@ static Device::BuiltinAction PromptAndWait(Device* device, InstallResult status)
   auto ui = device->GetUI();
   bool update_in_progress = (device->GetReason().value_or("") == "update_in_progress");
   for (;;) {
+    ui->SetInstallStage(RecoveryUI::InstallStage::NONE);
     FinishRecovery(ui);
     switch (status) {
       case INSTALL_SUCCESS:
@@ -516,13 +560,9 @@ change_menu:
       return Device::KEY_INTERRUPTED;
     }
 
-    if (chosen_item == Device::kGoBack) {
-      device->GoBack();
-      goto change_menu;
-    }
-
-    if (chosen_item == Device::kGoHome) {
-      device->GoHome();
+    if (chosen_item == Device::kGoBack || chosen_item == Device::kGoHome) {
+      if (chosen_item == Device::kGoBack) device->GoBack();
+      else device->GoHome();
       goto change_menu;
     }
 
@@ -537,9 +577,6 @@ change_menu:
       case Device::MENU_BASE:
       case Device::MENU_WIPE:
       case Device::MENU_ADVANCED:
-      case Device::MENU_CARD_HOME:
-      case Device::MENU_CARD_POWER:
-      case Device::MENU_TEXT_HOME:
         goto change_menu;
 
       case Device::REBOOT_FROM_FASTBOOT:    // Can not happen
@@ -630,19 +667,37 @@ change_menu:
           return Device::REBOOT_RECOVERY;
         }
 
-        ui->Print("\nInstall completed with status %d.\n", status);
+        if (status == INSTALL_NONE) {
+          // Cancellation is a normal return to the menu. Keep the detail in the
+          // recovery log, but do not expose the transient text page or footer.
+          LOG(INFO) << "Installation cancelled or no package received.";
+          update_in_progress = false;
+          ui->ClearText();
+          ui->ShowText(true);
+        } else {
+          ui->Print("\nInstall completed with status %d.\n", status);
+        }
         if (status == INSTALL_SUCCESS) {
           update_in_progress = false;
           if (!ui->IsTextVisible()) {
             return Device::NO_ACTION;  // reboot if logs aren't visible
           }
+        } else if (status == INSTALL_NONE) {
+          // The next menu replaces the cancelled page without a transition.
         } else {
           ui->SetBackground(RecoveryUI::ERROR);
           ui->Print("Installation aborted.\n");
           copy_logs(save_current_log);
         }
+        if (chosen_action != Device::ENTER_RESCUE && ui->IsTextVisible()) {
+          ShowInstallResult(device, status);
+        }
         break;
       }
+
+      case Device::OPEN_TERMINAL:
+        ui->ShowTerminal();
+        break;
 
       case Device::VIEW_RECOVERY_LOGS:
         choose_recovery_file(device);
@@ -652,7 +707,6 @@ change_menu:
         android::base::SetProperty("ro.adb.secure.recovery", "0");
         android::base::SetProperty("ctl.restart", "adbd");
         device->RemoveMenuItemForAction(Device::ENABLE_ADB);
-        device->GoHome();
         ui->Print("Enabled ADB.\n");
         break;
 
@@ -887,11 +941,29 @@ Device::BuiltinAction start_recovery(Device* device, const std::vector<std::stri
   // Assume the first instance of "-[0-9]{8}-", or "-[0-9]{8}_[0-9]{6}-" in case
   // LINEAGE_VERSION_APPEND_TIME_OF_DAY is set to true has the desired date.
   std::string ver = android::base::GetProperty("ro.uwu.release", "");
-  std::string ver_date = android::base::GetProperty("ro.system.build.version.release_or_codename", "");  // Empty if no match.
+  if (ver.empty()) {
+    ver = android::base::GetProperty("ro.uwu.version", "");
+  }
+  if (ver.empty()) {
+    ver = android::base::GetProperty("ro.lineage.version", "");
+  }
+  std::smatch ver_date_match;
+  std::regex_search(ver, ver_date_match, std::regex("-(\\d{8}(_\\d{6})?)-"));
+  std::string ver_date = ver_date_match.str(1);  // Empty if no match.
+
+  std::string build_version = android::base::GetProperty("ro.uwu.release", "");
+  if (build_version.empty()) {
+    build_version = android::base::GetProperty("ro.uwu.build.version", "");
+  }
+  if (build_version.empty()) {
+    build_version = android::base::GetProperty("ro.lineage.build.version", "");
+  }
+  if (build_version.empty()) {
+    build_version = android::base::GetProperty("ro.build.version.incremental", "(unknown)");
+  }
 
   std::vector<std::string> title_lines = {
-    "Version " + android::base::GetProperty("ro.uwu.release", "(unknown)") +
-        " (" + ver_date + ")",
+    "Version " + build_version + " (" + ver_date + ")",
   };
   title_lines.push_back("Product name - " + android::base::GetProperty("ro.product.device", ""));
   if (android::base::GetBoolProperty("ro.build.ab_update", false)) {
@@ -1026,6 +1098,8 @@ Device::BuiltinAction start_recovery(Device* device, const std::vector<std::stri
     if (sideload_auto_reboot) {
       status = INSTALL_REBOOT;
       ui->Print("Rebooting automatically.\n");
+    } else if (status != INSTALL_REBOOT && status != INSTALL_REBOOT_RECOVERY && ui->IsTextVisible()) {
+      ShowInstallResult(device, status);
     }
   } else if (rescue) {
     save_current_log = true;
@@ -1038,6 +1112,7 @@ Device::BuiltinAction start_recovery(Device* device, const std::vector<std::stri
     ui->ShowText(true);
     status = INSTALL_NONE;  // No command specified
     ui->SetBackground(RecoveryUI::NO_COMMAND);
+
   }
 
   if (status == INSTALL_ERROR || status == INSTALL_CORRUPT) {
