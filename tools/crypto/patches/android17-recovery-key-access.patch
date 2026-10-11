@@ -1,0 +1,111 @@
+--- a/private/vold.te
++++ b/private/vold.te
+@@ -413,11 +413,17 @@
+   is_flag_enabled(RELEASE_UNLOCKED_STORAGE_API, ` -vold_prepare_subdirs ')
+ } data_file_type:dir ioctl { FS_IOC_SET_ENCRYPTION_POLICY };
+ 
+-# Only vold should ever add/remove file-based encryption keys.
++# Only vold can remove keys. Opt-in Recovery may load existing keys and inspect
++# their status, but must not remove keys or set encryption policies.
+ neverallowxperm {
+   domain
+   -vold
+-} data_file_type:dir ioctl { FS_IOC_ADD_ENCRYPTION_KEY FS_IOC_REMOVE_ENCRYPTION_KEY FS_IOC_GET_ENCRYPTION_KEY_STATUS };
++} data_file_type:dir ioctl { FS_IOC_REMOVE_ENCRYPTION_KEY };
++neverallowxperm {
++  domain
++  -vold
++  recovery_crypto_only(`-recovery')
++} data_file_type:dir ioctl { FS_IOC_ADD_ENCRYPTION_KEY FS_IOC_GET_ENCRYPTION_KEY_STATUS };
+ 
+ neverallow {
+     domain
+@@ -430,12 +436,14 @@
+     -init
+     -vold
+     -vold_prepare_subdirs
++    recovery_crypto_only(`-recovery')
+ } vold_data_file:dir *;
+ 
+ neverallow {
+     domain
+     -init
+     -vold
++    recovery_crypto_only(`-recovery')
+ } vold_metadata_file:dir *;
+ 
+ neverallow {
+@@ -443,6 +451,7 @@
+     -kernel
+     -vold
+     -vold_prepare_subdirs
++    recovery_crypto_only(`-recovery')
+ } vold_data_file:notdevfile_class_set ~{ relabelto getattr };
+ 
+ neverallow {
+@@ -450,6 +459,7 @@
+     -init
+     -vold
+     -vold_prepare_subdirs
++    recovery_crypto_only(`-recovery')
+ } vold_metadata_file:notdevfile_class_set ~{ relabelto getattr };
+ 
+ neverallow {
+@@ -458,7 +468,16 @@
+     -kernel
+     -vold
+     -vold_prepare_subdirs
++    recovery_crypto_only(`-recovery')
+ } { vold_data_file vold_metadata_file }:notdevfile_class_set *;
++
++# Limit the exception to read-only regular files and directory traversal. Keep
++# non-regular-file access forbidden; these are guards, not allow rules.
++recovery_crypto_only(`
++neverallow recovery { vold_data_file vold_metadata_file }:file ~r_file_perms;
++neverallow recovery { vold_data_file vold_metadata_file }:dir ~r_dir_perms;
++neverallow recovery { vold_data_file vold_metadata_file }:{ lnk_file sock_file fifo_file } *;
++')
+ 
+ neverallow { domain -vold -init } restorecon_prop:property_service set;
+ 
+--- a/private/keystore.te
++++ b/private/keystore.te
+@@ -95,10 +95,18 @@
+ ###
+ 
+ neverallow { domain -keystore } keystore_data_file:dir ~{ open create read getattr setattr search relabelto ioctl };
+-neverallow { domain -keystore } keystore_data_file:notdevfile_class_set ~{ relabelto getattr };
++neverallow { domain -keystore recovery_crypto_only(`-recovery') } keystore_data_file:notdevfile_class_set ~{ relabelto getattr };
+ 
+-neverallow { domain -keystore -init } keystore_data_file:dir *;
+-neverallow { domain -keystore -init } keystore_data_file:notdevfile_class_set *;
++neverallow { domain -keystore -init recovery_crypto_only(`-recovery') } keystore_data_file:dir *;
++neverallow { domain -keystore -init recovery_crypto_only(`-recovery') } keystore_data_file:notdevfile_class_set *;
++
++# Recovery may snapshot existing regular-file databases. Keep writes, execution
++# and all non-regular-file access forbidden even when the device opts in.
++recovery_crypto_only(`
++neverallow recovery keystore_data_file:file ~r_file_perms;
++neverallow recovery keystore_data_file:dir ~r_dir_perms;
++neverallow recovery keystore_data_file:{ lnk_file sock_file fifo_file } *;
++')
+ 
+ neverallow * keystore:process ptrace;
+ 
+--- a/public/te_macros
++++ b/public/te_macros
+@@ -550,6 +550,14 @@
+ #
+ define(`recovery_only', ifelse(target_recovery, `true', $1, ))
+ 
++# Existing-key recovery is explicitly enabled by the device BoardConfig. The
++# exception is absent from normal Android and from non-opt-in Recovery policy.
++define(`recovery_crypto_only', `
++ifelse(target_recovery, `true', `
++ifelse(recovery_crypto_android17, `true', `$1')
++')
++')
++
+ #####################################
+ # Not recovery
+ # SELinux rules which apply only to non-recovery (normal) mode

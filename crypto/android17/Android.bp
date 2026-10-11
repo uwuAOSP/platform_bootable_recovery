@@ -1,0 +1,66 @@
+/*
+ * SPDX-FileCopyrightText: The uwuAOSP Project
+ * SPDX-License-Identifier: Apache-2.0
+ */
+package {
+    default_applicable_licenses: ["bootable_recovery_license"],
+}
+
+// Nothing in this backend is selected or linked unless the product opts in.
+// Keeping dependencies inside this condition also protects products whose AIDL/
+// SQLite projects do not yet provide Recovery variants.
+soong_config_module_type {
+    name: "recovery_crypto_android17_defaults_type",
+    module_type: "cc_defaults",
+    config_namespace: "recovery_crypto",
+    bool_variables: ["android17"],
+    properties: ["enabled", "srcs", "header_libs", "shared_libs", "static_libs"],
+}
+
+recovery_crypto_android17_defaults_type {
+    name: "recovery_crypto_android17_defaults",
+    enabled: false,
+    cpp_std: "c++20",
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+    visibility: ["//visibility:public"],
+    soong_config_variables: {
+        android17: {
+            enabled: true,
+            srcs: [
+                "backend.cpp", "config.cpp", "diagnostic.cpp", "files.cpp", "hal.cpp", "key_storage.cpp",
+                "primitives.cpp", "sqlite_snapshot.cpp", "storage.cpp", "synthetic_password.cpp",
+            ],
+            header_libs: ["librecovery_crypto_backend_headers"],
+            shared_libs: [
+                "libbase", "libcrypto", "libbinder_ndk", "libhidlbase", "libutils", "liblog",
+                "android.hardware.security.keymint-V5-ndk",
+                "android.hardware.security.secureclock-V1-ndk",
+                "android.hardware.security.sharedsecret-V1-ndk",
+                "android.hardware.gatekeeper-V1-ndk",
+                "android.hardware.weaver-V3-ndk",
+                "android.hardware.gatekeeper@1.0", "android.hardware.weaver@1.0",
+                "android.hardware.keymaster@4.0", "android.hardware.keymaster@4.1",
+            ],
+            static_libs: ["libfstab", "libdm", "libext2_uuid", "librecovery_crypto_sqlite"],
+        },
+    },
+}
+
+cc_library_shared {
+    name: "librecovery_crypto_android17",
+    defaults: ["recovery_crypto_android17_defaults"],
+    recovery: true,
+    stem: "librecovery_crypto_backend",
+    visibility: ["//visibility:public"],
+}
+
+// Maintainers compile/run this explicitly. Merely syncing Recovery runs no tests
+// and this target never calls the exported backend or accesses real user keys.
+// Use the normal Android test image: these synthetic fixtures do not require
+// Recovery, and the platform gtest libraries do not expose Recovery variants.
+cc_test {
+    name: "recovery_crypto_android17_test",
+    defaults: ["recovery_crypto_android17_defaults"],
+    srcs: ["tests/native_test.cpp"],
+    local_include_dirs: ["."],
+}

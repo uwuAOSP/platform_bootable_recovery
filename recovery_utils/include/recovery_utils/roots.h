@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (C) 2026 The uwuAOSP Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,7 +58,9 @@ int format_volume(const std::string& volume, const std::string& directory,
 
 // Ensure that all and only the volumes that packages expect to find
 // mounted (/tmp and /cache) are mounted.  Returns 0 on success.
-int setup_install_mounts();
+// For A/B OTA packages, preserve_data leaves /data in its existing state so
+// an internal-storage package remains readable throughout installation.
+int setup_install_mounts(bool preserve_data = false);
 
 // Returns true if there is /cache in the volumes.
 bool HasCache();

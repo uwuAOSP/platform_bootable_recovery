@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (C) 2026 The uwuAOSP Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -75,9 +76,10 @@ static constexpr int kRecoveryApiVersion = 3;
 // into target_files.zip. Assert the version defined in code and in Android.mk are consistent.
 static_assert(kRecoveryApiVersion == RECOVERY_API_VERSION, "Mismatching recovery API versions.");
 
-// Default allocation of progress bar segments to operations
-static constexpr int VERIFICATION_PROGRESS_TIME = 60;
-static constexpr float VERIFICATION_PROGRESS_FRACTION = 0.25;
+// Signature verification is disabled below. Do not reserve a timed progress segment
+// for work that does not run; updater scopes must cover the full installation.
+static constexpr int VERIFICATION_PROGRESS_TIME = 0;
+static constexpr float VERIFICATION_PROGRESS_FRACTION = 0.0;
 // The charater used to separate dynamic fingerprints. e.x. sargo|aosp-sargo
 #define FINGERPRING_SEPARATOR "|"
 static constexpr auto&& RELEASE_KEYS_TAG = "release-keys";
@@ -511,6 +513,22 @@ static InstallResult TryUpdateBinary(Package* package, bool* wipe_cache,
     return INSTALL_CORRUPT;
   }
 
+  // The status pipe only carries progress and ui_print. Tee the updater's standard
+  // output/error separately so partition operations also reach the installation UI.
+  android::base::unique_fd output_read, output_write;
+  if (!android::base::Pipe(&output_read, &output_write, O_CLOEXEC)) {
+    PLOG(ERROR) << "Failed to create pipe for updater output";
+    return INSTALL_ERROR;
+  }
+  // Transfer ownership before fdopen adopts the descriptor; recover it on failure.
+  const int output_fd = output_read.release();
+  std::unique_ptr<FILE, decltype(&fclose)> updater_output(fdopen(output_fd, "r"), fclose);
+  if (!updater_output) {
+    output_read.reset(output_fd);
+    PLOG(ERROR) << "Failed to open updater output";
+    return INSTALL_ERROR;
+  }
+
   pid_t pid = fork();
   if (pid == -1) {
     PLOG(ERROR) << "Failed to fork update binary";
@@ -521,6 +539,11 @@ static InstallResult TryUpdateBinary(Package* package, bool* wipe_cache,
   if (pid == 0) {
     umask(022);
     pipe_read.reset();
+    if (dup2(output_write.get(), STDOUT_FILENO) == -1 ||
+        dup2(output_write.get(), STDERR_FILENO) == -1) {
+      _exit(EXIT_FAILURE);
+    }
+    output_write.reset();
 
     // Convert the std::string vector to a NULL-terminated char* vector suitable for execv.
     auto chr_args = StringVectorToNullTerminatedArray(args);
@@ -532,6 +555,13 @@ static InstallResult TryUpdateBinary(Package* package, bool* wipe_cache,
     _exit(EXIT_FAILURE);
   }
   pipe_write.reset();
+  output_write.reset();
+  std::thread output_logger([&]() {
+    char output[4096];
+    while (fgets(output, sizeof(output), updater_output.get()) != nullptr) {
+      ui->Print("%s", output);  // Also preserves the complete output in recovery.log.
+    }
+  });
 
   std::atomic<bool> logger_finished(false);
   std::thread temperature_logger(log_max_temperature, max_temperature, std::ref(logger_finished));
@@ -597,6 +627,7 @@ static InstallResult TryUpdateBinary(Package* package, bool* wipe_cache,
 
   int status;
   waitpid(pid, &status, 0);
+  output_logger.join();
 
   logger_finished.store(true);
   finish_log_temperature.notify_one();
@@ -632,7 +663,7 @@ static InstallResult VerifyAndInstallPackage(Package* package, bool* wipe_cache,
                                              int* max_temperature, Device* device) {
   auto ui = device->GetUI();
   ui->SetBackground(RecoveryUI::INSTALLING_UPDATE);
-  // Give verification half the progress bar...
+  // Reset progress without advancing through the disabled verification step.
   ui->SetProgressType(RecoveryUI::DETERMINATE);
   ui->ShowProgress(VERIFICATION_PROGRESS_FRACTION, VERIFICATION_PROGRESS_TIME);
 
@@ -646,6 +677,7 @@ static InstallResult VerifyAndInstallPackage(Package* package, bool* wipe_cache,
    */
 
   // Verify and install the contents of the package.
+  ui->SetInstallStage(RecoveryUI::InstallStage::INSTALLING);
   ui->Print("Installing update...\n");
   if (retry_count > 0) {
     ui->Print("Retry attempt: %d\n", retry_count);
@@ -662,6 +694,7 @@ static InstallResult VerifyAndInstallPackage(Package* package, bool* wipe_cache,
 InstallResult InstallPackage(Package* package, const std::string_view package_id,
                              bool should_wipe_cache, int retry_count, Device* device) {
   auto ui = device->GetUI();
+  ui->SetInstallStage(RecoveryUI::InstallStage::VERIFYING);
   auto start = std::chrono::system_clock::now();
 
   int start_temperature = GetMaxValueFromThermalZone();
@@ -670,6 +703,18 @@ InstallResult InstallPackage(Package* package, const std::string_view package_id
   InstallResult result;
   std::vector<std::string> log_buffer;
 
+  // A/B updates write the inactive slot. Their source can be an open file on
+  // decrypted /data, exposed through FUSE as /sideload/package.zip. Keep /data
+  // mounted for these packages; legacy updaters retain the usual mount setup.
+  bool preserve_data = false;
+  if (package && package->GetType() == PackageType::kFile &&
+      android::base::GetBoolProperty("ro.build.ab_update", false)) {
+    auto zip = package->GetZipArchiveHandle();
+    std::map<std::string, std::string> metadata;
+    preserve_data = zip && ReadMetadataFromPackage(zip, &metadata) &&
+                    get_value(metadata, "ota-type") == OtaTypeToString(OtaType::AB);
+  }
+
   ui->Print("Supported API: %d\n", kRecoveryApiVersion);
 
   ui->Print("Finding update package...\n");
@@ -677,7 +722,7 @@ InstallResult InstallPackage(Package* package, const std::string_view package_id
   if (!package) {
     log_buffer.push_back(android::base::StringPrintf("error: %d", kMapFileFailure));
     result = INSTALL_CORRUPT;
-  } else if (setup_install_mounts() != 0) {
+  } else if (setup_install_mounts(preserve_data) != 0) {
     LOG(ERROR) << "failed to set up expected mounts for install; aborting";
     result = INSTALL_ERROR;
   } else {
@@ -745,6 +790,14 @@ InstallResult InstallPackage(Package* package, const std::string_view package_id
     }
   }
 
+  // Also cover command-line installs, which do not pass through PromptAndWait.
+  if (result == INSTALL_SUCCESS) {
+    ui->SetInstallStage(RecoveryUI::InstallStage::SUCCESS);
+  } else if (result == INSTALL_ERROR || result == INSTALL_CORRUPT) {
+    ui->SetInstallStage(RecoveryUI::InstallStage::ERROR);
+  } else {
+    ui->SetInstallStage(RecoveryUI::InstallStage::NONE);
+  }
   return result;
 }
 

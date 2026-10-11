@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "patch": "android17-uwu-recovery-key-access.patch",
+  "sha256": "8e2f6f7f03f047a7c0066a7a6e8a61157f4a31887283325bc11cb9dfad59a691",
+  "files": {
+    "private/vold.te": {
+      "base_sha256": "495ff3ebf797f5e21a0673014cccbe468a4d9d19b52dc073000d36248f9d3e2a",
+      "patched_sha256": "fc65dc5da65197a56c8e3fd47e11e3e0805e87e3391573e1ef1f1e213aa5a0ea"
+    },
+    "private/keystore.te": {
+      "base_sha256": "6d13c232493bf4974e928e707ab55291e958fc299e2a2de304bc820254c375ad",
+      "patched_sha256": "e8b959326584c3e352c58c89aaf6332ff567442d7c21a36a556e296aa2097425"
+    },
+    "public/te_macros": {
+      "base_sha256": "9825ba9b9bd742070683f21ad636e930ec24c73e3ec9dcb22b85e2dcb9b0367d",
+      "patched_sha256": "234747c0a63798a1492dd77ca612486c767cb9ac9478bfe42c0989a94914c69a"
+    }
+  },
+  "fixture_global_macros_sha256": "e5b311ddafb1066f228c21c2ede892f70fd0e5280fef9ea17eac5eeb2ea6ceee",
+  "source_revision": "b41cbf3b46882139654574fe46ca5cf8175bf8a5",
+  "source": "https://github.com/uwuAOSP/platform_system_sepolicy/tree/b41cbf3b46882139654574fe46ca5cf8175bf8a5",
+  "scope": "Same opt-in Recovery existing-key exception as the AOSP variant; preserve all upstream exclusions, including apexd. Base hashes document review inputs; context matching permits unrelated edits."
+}

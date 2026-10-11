@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 The Android Open Source Project
+ * Copyright (C) 2026 The uwuAOSP Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -268,10 +269,17 @@ void RecoveryUI::CalibrateTouch(int fd) {
 }
 
 void RecoveryUI::OnTouchPress() {
+  discard_touch_until_press_ = false;
   touch_start_ = touch_track_ = touch_pos_;
+  if (gesture_input_) EnqueueGesture(EventType::TOUCH_DOWN, touch_pos_);
 }
 
 void RecoveryUI::OnTouchTrack() {
+  if (discard_touch_until_press_) return;
+  if (gesture_input_) {
+    EnqueueGesture(EventType::TOUCH_MOVE, touch_pos_);
+    return;
+  }
   if (touch_pos_.y() <= gr_fb_height_real()) {
     const double scaleX = static_cast<double>(touch_pos_.x()) / gr_fb_width_real();
     const double scaleY = static_cast<double>(touch_pos_.y()) / gr_fb_height_real();
@@ -308,6 +316,11 @@ void RecoveryUI::OnTouchTrack() {
 }
 
 void RecoveryUI::OnTouchRelease() {
+  if (discard_touch_until_press_) return;
+  if (gesture_input_) {
+    EnqueueGesture(EventType::TOUCH_UP, touch_pos_);
+    return;
+  }
   // Allow turning on text mode with any swipe, if bootloader has set a bootreason of recovery_ui.
   if (is_bootreason_recovery_ui_ && !IsTextVisible()) {
     ShowText(true);
@@ -386,6 +399,11 @@ int RecoveryUI::OnInputEvent(int fd, uint32_t epevents) {
         OnTouchRelease();
         touch_reported_ = false;
         touch_saw_x_ = touch_saw_y_ = false;
+      } else if (gesture_input_ && touch_reported_ && (touch_saw_x_ || touch_saw_y_)) {
+        // Gesture frames can update only one axis (horizontal/vertical strokes).
+        // Use the final coordinates in SYN_REPORT, not a half-updated ABS pair.
+        OnTouchTrack();
+        touch_saw_x_ = touch_saw_y_ = false;
       }
     }
     return 0;
@@ -425,7 +443,7 @@ int RecoveryUI::OnInputEvent(int fd, uint32_t epevents) {
         touch_finger_down_ = true;
         touch_saw_x_ = true;
         touch_pos_.x(ev.value * gr_fb_width_real() / (touch_max_.x() - touch_min_.x()));
-        if (touch_reported_ && touch_saw_y_) {
+        if (!gesture_input_ && touch_reported_ && touch_saw_y_) {
           OnTouchTrack();
           touch_saw_x_ = touch_saw_y_ = false;
         }
@@ -435,7 +453,7 @@ int RecoveryUI::OnInputEvent(int fd, uint32_t epevents) {
         touch_finger_down_ = true;
         touch_saw_y_ = true;
         touch_pos_.y(ev.value * gr_fb_height_real() / (touch_max_.y() - touch_min_.y()));
-        if (touch_reported_ && touch_saw_x_) {
+        if (!gesture_input_ && touch_reported_ && touch_saw_x_) {
           OnTouchTrack();
           touch_saw_x_ = touch_saw_y_ = false;
         }
@@ -563,6 +581,36 @@ void RecoveryUI::EnqueueTouch(const Point& pos) {
   }
 }
 
+void RecoveryUI::SetTouchMoveCoalescing(bool enabled, const Point& minimum, const Point& maximum) {
+  std::lock_guard<std::mutex> lg(event_queue_mutex);
+  coalesce_touch_moves_=enabled;coalescing_gesture_=false;
+  coalesce_touch_min_=minimum;coalesce_touch_max_=maximum;
+}
+
+void RecoveryUI::EnqueueGesture(EventType type, const Point& pos) {
+  std::lock_guard<std::mutex> lg(event_queue_mutex);
+  if (type == EventType::TOUCH_DOWN) {
+    coalescing_gesture_=coalesce_touch_moves_ && pos.x()>=coalesce_touch_min_.x() &&
+        pos.x()<coalesce_touch_max_.x() && pos.y()>=coalesce_touch_min_.y() && pos.y()<coalesce_touch_max_.y();
+  }
+  if (type == EventType::TOUCH_UP) coalescing_gesture_=false;
+  if (coalescing_gesture_ && type == EventType::TOUCH_MOVE && event_queue_len > 0 &&
+      event_queue[event_queue_len - 1].type() == EventType::TOUCH_MOVE) {
+    event_queue[event_queue_len - 1] = InputEvent(type, pos);
+    event_queue_cond.notify_one();
+    return;
+  }
+  const int queue_max = sizeof(event_queue) / sizeof(event_queue[0]);
+  if (event_queue_len == queue_max) {
+    // Never silently lose a point or finger-up and submit a different pattern.
+    event_queue_len = 0;
+    event_queue[event_queue_len++] = InputEvent(EventType::EXTRA, KeyError::INTERRUPTED);
+  } else {
+    event_queue[event_queue_len++] = InputEvent(type, pos);
+  }
+  event_queue_cond.notify_one();
+}
+
 void RecoveryUI::SetScreensaverState(ScreensaverState state) {
   switch (state) {
     case ScreensaverState::NORMAL:
@@ -628,7 +676,8 @@ RecoveryUI::InputEvent RecoveryUI::WaitInputEvent() {
         // Drop the first key if it's changing from OFF to NORMAL.
         if (screensaver_state_ == ScreensaverState::OFF) {
           if (event_queue_len > 0) {
-            memcpy(&event_queue[0], &event_queue[1], sizeof(int) * --event_queue_len);
+            memmove(&event_queue[0], &event_queue[1], sizeof(InputEvent) * --event_queue_len);
+            event_queue[event_queue_len] = InputEvent(EventType::TOUCH, Point());
           }
         }
 
@@ -641,7 +690,8 @@ RecoveryUI::InputEvent RecoveryUI::WaitInputEvent() {
   InputEvent event;
   if (event_queue_len > 0) {
     event = event_queue[0];
-    memcpy(&event_queue[0], &event_queue[1], sizeof(InputEvent) * --event_queue_len);
+    memmove(&event_queue[0], &event_queue[1], sizeof(InputEvent) * --event_queue_len);
+    event_queue[event_queue_len] = InputEvent(EventType::TOUCH, Point());
   }
   return event;
 }
@@ -701,6 +751,7 @@ bool RecoveryUI::HasTouchScreen() const {
 void RecoveryUI::FlushKeys() {
   std::lock_guard<std::mutex> lg(event_queue_mutex);
   event_queue_len = 0;
+  for (auto& event : event_queue) event = InputEvent(EventType::TOUCH, Point());
 }
 
 RecoveryUI::KeyAction RecoveryUI::CheckKey(int key, bool is_long_press) {

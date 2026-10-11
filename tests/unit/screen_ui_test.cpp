@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2026 The uwuAOSP Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,9 +36,134 @@
 #include "private/resources.h"
 #include "recovery_ui/device.h"
 #include "recovery_ui/screen_ui.h"
+#include "recovery_ui/m3e_pattern.h"
 
 static const std::vector<std::string> HEADERS{ "header" };
 static const std::vector<std::string> ITEMS{ "item1", "item2", "item3", "item4", "1234567890" };
+
+// Synthetic cells only; these fixtures never read a user's credential or a HAL.
+class TestPattern : public recovery_ui::PatternInput {
+ public:
+  explicit TestPattern(unsigned grid = 3) : grid_(grid) {}
+  unsigned GridSize() const override { return grid_; }
+  size_t Size() const override { return cells.size(); }
+  uint8_t Cell(size_t index) const override { return cells[index]; }
+  bool Append(uint8_t cell) override {
+    if (cells.size() == grid_ * grid_) return false;
+    cells.push_back(cell);
+    return true;
+  }
+  void Clear() override { cells.clear(); }
+  std::vector<uint8_t> cells;
+ private:
+  unsigned grid_;
+};
+
+TEST(PatternInputTest, InsertsOnlyUnvisitedMidpointsAndRejectsDuplicates) {
+  TestPattern pattern;
+  ASSERT_TRUE(pattern.Select(0));
+  ASSERT_TRUE(pattern.Select(2));
+  EXPECT_EQ(pattern.cells, (std::vector<uint8_t>{0, 1, 2}));
+  EXPECT_FALSE(pattern.Select(1));
+  EXPECT_FALSE(pattern.Select(9));
+  ASSERT_TRUE(pattern.Select(8));
+  EXPECT_EQ(pattern.cells, (std::vector<uint8_t>{0, 1, 2, 5, 8}));
+  pattern.Clear();
+  pattern.Select(4);
+  pattern.Select(0);
+  pattern.Select(8);
+  EXPECT_EQ(pattern.cells, (std::vector<uint8_t>{4, 0, 8}));
+}
+
+TEST(PatternInputTest, SparseMotionKeepsCrossedDotsInOrder) {
+  using namespace recovery_m3e;
+  SetScaleBasis(360, 800);
+  auto layout = PatternBounds(Metrics(360), 180, 776);
+  TestPattern pattern;
+  auto [x0, y0] = layout.Dot(0);
+  auto [x2, y2] = layout.Dot(2);
+  pattern.Select(0);
+  TracePattern(pattern, layout, x0, y0, x2, y2);
+  EXPECT_EQ(pattern.cells, (std::vector<uint8_t>{0, 1, 2}));
+  auto [x8, y8] = layout.Dot(8);
+  TracePattern(pattern, layout, x2, y2, x8, y8);
+  EXPECT_EQ(pattern.cells, (std::vector<uint8_t>{0, 1, 2, 5, 8}));
+  pattern.Clear();
+  pattern.Select(0);
+  TracePattern(pattern, layout, x0, y0, x8, y8);
+  EXPECT_EQ(pattern.cells, (std::vector<uint8_t>{0, 4, 8}));
+  TracePattern(pattern, layout, x8, y8, x0, y0);
+  EXPECT_EQ(pattern.cells, (std::vector<uint8_t>{0, 4, 8}));
+}
+
+TEST(PatternInputTest, ControlsRemainOutsideGridOnPortraitAndLandscape) {
+  using namespace recovery_m3e;
+  for (const auto& dimensions : std::vector<std::pair<int, int>>{{360, 800}, {1220, 2712},
+                                                               {800, 360}, {240, 320}}) {
+    auto [width, height] = dimensions;
+    SetScaleBasis(width, height);
+    Metrics m(width);
+    int top = Dp(width, 180), bottom = height - Dp(width, 24);
+    for (unsigned n = 3; n <= 6; ++n) {
+      auto layout = PatternBounds(m, top, bottom, n);
+      for (const auto& b : {layout.grid, layout.unlock, layout.clear, layout.cancel}) {
+        EXPECT_GT(b.w, 0);
+        EXPECT_GT(b.h, 0);
+        EXPECT_GE(b.x, 0);
+        EXPECT_GE(b.y, top);
+        EXPECT_LE(b.x + b.w, width);
+        EXPECT_LE(b.y + b.h, bottom);
+      }
+      for (int cell = 0; cell < layout.CellCount(); ++cell) {
+        auto [x, y] = layout.Dot(cell);
+        EXPECT_EQ(layout.HitDot(x, y), cell);
+        EXPECT_EQ(layout.HitAction(x, y), -2);  // Empty space must not mean Back.
+      }
+      for (const auto& b : {layout.unlock, layout.clear, layout.cancel}) {
+        EXPECT_TRUE(b.x >= layout.grid.x + layout.grid.w ||
+                    b.y >= layout.grid.y + layout.grid.h);
+      }
+      EXPECT_EQ(layout.HitAction(layout.unlock.x + 1, layout.unlock.y + 1), layout.UnlockAction());
+      EXPECT_EQ(layout.HitAction(layout.clear.x + 1, layout.clear.y + 1), layout.ClearAction());
+      EXPECT_EQ(layout.HitAction(layout.cancel.x + 1, layout.cancel.y + 1), layout.CancelAction());
+    }
+  }
+  SetScaleBasis(0, 0);
+}
+
+TEST(PatternInputTest, LargerGridsFillAllStraightGapsInOrder) {
+  using namespace recovery_m3e;
+  SetScaleBasis(360, 800);
+  for (unsigned n = 3; n <= 6; ++n) {
+    TestPattern input(n);
+    auto layout = PatternBounds(Metrics(360), 180, 776, n);
+    auto [x0, y0] = layout.Dot(0);
+    auto [xl, yl] = layout.Dot(n * n - 1);
+    ASSERT_TRUE(input.Select(0));
+    TracePattern(input, layout, x0, y0, xl, yl);
+    std::vector<uint8_t> diagonal;
+    for (unsigned i = 0; i < n; ++i) diagonal.push_back(i * (n + 1));
+    EXPECT_EQ(input.cells, diagonal);
+    input.Clear();
+    input.Select(0);
+    input.Select(n - 1);
+    std::vector<uint8_t> border;
+    for (unsigned i = 0; i < n; ++i) border.push_back(i);
+    EXPECT_EQ(input.cells, border);
+    input.Select(n * n - 1);
+    for (unsigned i = 1; i < n; ++i) border.push_back(i * n + n - 1);
+    EXPECT_EQ(input.cells, border);
+    EXPECT_FALSE(input.Select(n * n));
+    EXPECT_FALSE(input.Select(n - 1));
+    input.Clear();
+    input.Select(0);
+    input.Select(n + 2);  // A non-axis/non-diagonal jump must not fill a gap.
+    EXPECT_EQ(input.cells, (std::vector<uint8_t>{0, static_cast<uint8_t>(n + 2)}));
+  }
+  TestPattern invalid(7);
+  EXPECT_FALSE(invalid.Select(0));
+  SetScaleBasis(0, 0);
+}
 
 // TODO(xunchang) check if some draw functions are called when drawing menus.
 class MockDrawFunctions : public DrawInterface {
